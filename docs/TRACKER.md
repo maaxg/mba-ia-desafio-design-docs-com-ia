@@ -102,7 +102,7 @@ Cada item registrado nos documentos, com sua origem na transcrição (`TRANSCRIC
 | ADR-001-D4 | docs/adrs/ADR-001-outbox-no-mysql.md | Decisão | PK UUID | TRANSCRICAO | [09:51] Larissa |
 | ADR-001-TO | docs/adrs/ADR-001-outbox-no-mysql.md | Trade-off | Redis descartado por overengineering para time pequeno | TRANSCRICAO | [09:07] Diego |
 | ADR-002 | docs/adrs/ADR-002-worker-separado-em-polling.md | Decisão | Worker em polling de 2s | TRANSCRICAO | [09:10] Larissa |
-| ADR-002-D2 | docs/adrs/ADR-002-worker-separado-em-polling.md | Decisão | Processo separado, `src/worker.ts`, `npm run worker` | TRANSCRICAO | [09:11] Larissa |
+| ADR-002-D2 | docs/adrs/ADR-002-worker-separado-em-polling.md | Decisão | Processo separado, `src/worker.ts` (novo), `npm run worker` | TRANSCRICAO | [09:11] Larissa |
 | ADR-002-D3 | docs/adrs/ADR-002-worker-separado-em-polling.md | Decisão | PrismaClient próprio por processo, mesma DATABASE_URL | TRANSCRICAO | [09:30] Bruno |
 | ADR-002-D3b | docs/adrs/ADR-002-worker-separado-em-polling.md | Restrição | `prisma` singleton instanciado ao carregar o módulo | CODIGO | src/config/database.ts |
 | ADR-002-D4 | docs/adrs/ADR-002-worker-separado-em-polling.md | Decisão | Lógica no módulo (`webhook.processor.ts`) | TRANSCRICAO | [09:28] Bruno |
@@ -193,7 +193,7 @@ Cada item registrado nos documentos, com sua origem na transcrição (`TRANSCRIC
 | FDD-INT-07 | docs/FDD.md | Integração | Limpeza das novas tabelas no `beforeEach` | CODIGO | tests/setup.ts |
 | FDD-INT-08 | docs/FDD.md | Integração | Nova factory `createTestWebhook` | CODIGO | tests/helpers/factories.ts |
 | FDD-INT-09 | docs/FDD.md | Integração | Scripts `worker` / `start:worker` | TRANSCRICAO | [09:11] Larissa |
-| FDD-INT-10 | docs/FDD.md | Integração | Estrutura de `src/modules/webhooks/` | TRANSCRICAO | [09:27] Bruno |
+| FDD-INT-10 | docs/FDD.md | Integração | Estrutura do módulo novo `src/modules/webhooks/` | TRANSCRICAO | [09:27] Bruno |
 | FDD-AC-01 | docs/FDD.md | Critério de aceite técnico | Teste de atomicidade com falha forçada | TRANSCRICAO | [09:41] Diego |
 | FDD-AC-08 | docs/FDD.md | Critério de aceite técnico | OPERATOR recebe 403 no replay; ADMIN 202 | TRANSCRICAO | [09:36] Larissa |
 | FDD-RSK-01 | docs/FDD.md | Risco | Outbox cresce sem arquivamento | TRANSCRICAO | [09:08] Diego |

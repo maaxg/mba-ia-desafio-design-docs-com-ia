@@ -4,10 +4,12 @@
 |---|---|
 | **Status** | Pronto para implementação. As decisões estão fechadas nos ADR-001…008. O [RFC](RFC.md) segue o rito de revisão com Bruno e Diego ([09:50] Larissa). |
 | **Base** | [RFC-001](RFC.md) · [ADR-001…008](RFC.md#7-decisões-relacionadas) · [TRANSCRICAO.md](../TRANSCRICAO.md) |
-| **Módulo novo** | `src/modules/webhooks/` + entry-point `src/worker.ts` |
+| **Módulo novo** | `src/modules/webhooks/` + entry-point `src/worker.ts` (ambos **a criar**, como proposto em [09:11] Larissa e [09:27]–[09:28] Bruno) |
 | **Estimativa** | 3 sprints, com revisão de segurança no fim ([09:46] Larissa) |
 
 > **Como ler este documento.** Tudo aqui deriva da transcrição ou do código. Onde a reunião não desceu ao detalhe necessário para codar, o FDD toma uma **decisão de implementação**, marcada com 🔧, derivada de falas ou restrições da reunião e com o fundamento registrado. A lista completa está na [seção 14](#14-decisões-de-implementação-tomadas-neste-fdd).
+>
+> **Caminhos de arquivo.** Todo caminho citado neste FDD existe no repositório, **exceto** `src/worker.ts` e os arquivos dentro de `src/modules/webhooks/`, que são os arquivos **novos que esta feature cria** (estrutura completa na [seção 13](#13-integração-com-o-sistema-existente)).
 
 ---
 
@@ -35,7 +37,7 @@
 - Tabelas `webhook_endpoints`, `webhook_outbox`, `webhook_deliveries`, `webhook_dead_letter` (Prisma + migration).
 - Função `publishWebhookEvent(tx, order, fromStatus, toStatus)` chamada dentro de `changeStatus`.
 - CRUD de configuração, rotação de secret, histórico de entregas e replay de DLQ (ADMIN).
-- Worker `src/worker.ts` + `src/modules/webhooks/webhook.processor.ts` com polling, assinatura, envio, retry e dead letter.
+- Worker `src/worker.ts` + `src/modules/webhooks/webhook.processor.ts` (novos) com polling, assinatura, envio, retry e dead letter.
 - Observabilidade com Pino e testes (Vitest + Supertest).
 
 **Excluído** (com origem)
@@ -328,6 +330,11 @@ Todos os endpoints ficam sob `/api/v1` (prefixo de `src/app.ts`), exigem `Author
 Qualquer role autenticada ([09:37] Sofia). O `customerId` vai no body, não sai do JWT ([09:32] Larissa).
 
 Request:
+```http
+POST /api/v1/webhooks
+Authorization: Bearer <JWT>
+Content-Type: application/json
+```
 ```json
 {
   "customerId": "6f1c2a4e-0b7d-4c1a-9a51-3f0e8b2d7c11",
@@ -361,6 +368,12 @@ Response `201 Created`. A `secret` aparece **apenas aqui e na rotação**:
 
 O `customerId` vai no **path**, já que um GET não tem body ("body ou path", [09:32] Larissa).
 
+Request (sem body):
+```http
+GET /api/v1/customers/6f1c2a4e-0b7d-4c1a-9a51-3f0e8b2d7c11/webhooks?page=1&pageSize=20
+Authorization: Bearer <JWT>
+```
+
 Response `200 OK` (formato `paginated()` de `src/shared/http/response.ts`, **sem** `secret`):
 ```json
 {
@@ -386,21 +399,48 @@ Status: `200`, `400 VALIDATION_ERROR` (`customerId` não-uuid), `401`, `404 NOT_
 Campos aceitos (todos opcionais, pelo menos um obrigatório): `url` (https), `events` (OrderStatus[], não vazio), `active` (boolean). O `customerId` não pode ser alterado.
 
 Request:
+```http
+PATCH /api/v1/webhooks/0b8e5d0a-3a52-4b3e-8f6d-2b1f4c9e7a10
+Authorization: Bearer <JWT>
+Content-Type: application/json
+```
 ```json
 { "url": "https://hooks.atlascomercial.com.br/oms/v2", "events": ["PAID", "SHIPPED", "DELIVERED"], "active": true }
 ```
-Response `200 OK`: o mesmo objeto de 6.1.2. Status: `200`, `400 VALIDATION_ERROR` (detalhes `WEBHOOK_INVALID_URL` / `WEBHOOK_INVALID_EVENT_FILTER`), `401`, `404 WEBHOOK_NOT_FOUND`.
+Response `200 OK` (mesmo formato de item de 6.1.2, **sem** `secret`):
+```json
+{
+  "id": "0b8e5d0a-3a52-4b3e-8f6d-2b1f4c9e7a10",
+  "customerId": "6f1c2a4e-0b7d-4c1a-9a51-3f0e8b2d7c11",
+  "url": "https://hooks.atlascomercial.com.br/oms/v2",
+  "events": ["PAID", "SHIPPED", "DELIVERED"],
+  "active": true,
+  "secretRotationPending": false,
+  "createdAt": "2026-11-20T13:58:02.114Z",
+  "updatedAt": "2026-11-20T15:21:47.390Z"
+}
+```
+Status: `200`, `400 VALIDATION_ERROR` (detalhes `WEBHOOK_INVALID_URL` / `WEBHOOK_INVALID_EVENT_FILTER`), `401`, `404 WEBHOOK_NOT_FOUND`.
 
 Mudanças em `events` e `active` só valem para eventos **futuros**. Linhas já na outbox não são refiltradas: um endpoint desativado tem seus pendentes descartados no envio (5.2, passo 3a).
 
 #### 6.1.4 `DELETE /api/v1/webhooks/:id` — remover ([09:33] Bruno)
 
-Response `204 No Content`. Status: `204`, `401`, `404 WEBHOOK_NOT_FOUND`.
+Request (sem body):
+```http
+DELETE /api/v1/webhooks/0b8e5d0a-3a52-4b3e-8f6d-2b1f4c9e7a10
+Authorization: Bearer <JWT>
+```
+Response `204 No Content` (sem body). Status: `204`, `401`, `404 WEBHOOK_NOT_FOUND`.
 Remove também a outbox, as entregas e a dead letter do endpoint (cascade) 🔧. Para pausar sem perder histórico, use `PATCH { "active": false }`.
 
 #### 6.1.5 `POST /api/v1/webhooks/:id/rotate-secret` — rotacionar secret ([09:21] Sofia)
 
-Request: corpo vazio.
+Request (corpo vazio):
+```http
+POST /api/v1/webhooks/0b8e5d0a-3a52-4b3e-8f6d-2b1f4c9e7a10/rotate-secret
+Authorization: Bearer <JWT>
+```
 Response `200 OK`:
 ```json
 {
@@ -414,6 +454,12 @@ Status: `200`, `401`, `404 WEBHOOK_NOT_FOUND`, `409 WEBHOOK_ENDPOINT_INACTIVE`.
 #### 6.1.6 `GET /api/v1/webhooks/:id/deliveries` — histórico de entregas ([09:34] Marcos)
 
 Retorna as **últimas 100 tentativas**, da mais recente para a mais antiga. Query opcional: `result=SUCCESS|FAILURE`.
+
+Request (sem body):
+```http
+GET /api/v1/webhooks/0b8e5d0a-3a52-4b3e-8f6d-2b1f4c9e7a10/deliveries
+Authorization: Bearer <JWT>
+```
 
 Response `200 OK`:
 ```json
@@ -450,7 +496,13 @@ Status: `200`, `401`, `404 WEBHOOK_NOT_FOUND`.
 
 #### 6.1.7 `POST /api/v1/admin/webhooks/dead-letter/:id/replay` — replay manual de DLQ ([09:18] Diego, [09:35] Diego)
 
-`authenticate` + `requireRole('ADMIN')` ([09:36] Sofia, Larissa). Corpo vazio.
+`authenticate` + `requireRole('ADMIN')` ([09:36] Sofia, Larissa).
+
+Request (corpo vazio; JWT de usuário ADMIN):
+```http
+POST /api/v1/admin/webhooks/dead-letter/e2a4.../replay
+Authorization: Bearer <JWT de ADMIN>
+```
 
 Response `202 Accepted`. O evento volta para a fila; a entrega é assíncrona:
 ```json
@@ -525,7 +577,7 @@ const ok = req.header('X-Signature')!.split(',').some((s) =>
 
 Todos os códigos do módulo usam o prefixo `WEBHOOK_` ([09:28] Bruno, [09:29] Larissa). Eles aparecem em três formas, conforme o ponto do sistema em que surgem.
 
-### 7.1 Erros de API: classes em `src/modules/webhooks/webhook.errors.ts` (`extends AppError`)
+### 7.1 Erros de API: classes no arquivo novo `src/modules/webhooks/webhook.errors.ts` (`extends AppError`)
 
 Serializados pelo `errorMiddleware` como `{ error: { code, message, details? } }`.
 
@@ -587,7 +639,7 @@ Erros reaproveitados sem mudança: `UNAUTHORIZED` (401) e `FORBIDDEN` (403) via 
 
 Não há retry automático além da dead letter, nem e-mail ao cliente ([09:37] Larissa). O fallback humano é o replay.
 
-Todas as constantes ficam em `src/modules/webhooks/webhook.constants.ts` 🔧, porque nenhum valor precisa variar por ambiente. A única variável nova em `src/config/env.ts` é a chave de cifra das secrets (`WEBHOOK_SECRET_ENCRYPTION_KEY`, [ADR-004](adrs/ADR-004-hmac-sha256-com-secret-por-endpoint.md)), que por ser segredo não pode ficar no código.
+Todas as constantes ficam no arquivo novo `src/modules/webhooks/webhook.constants.ts` 🔧, porque nenhum valor precisa variar por ambiente. A única variável nova em `src/config/env.ts` é a chave de cifra das secrets (`WEBHOOK_SECRET_ENCRYPTION_KEY`, [ADR-004](adrs/ADR-004-hmac-sha256-com-secret-por-endpoint.md)), que por ser segredo não pode ficar no código.
 
 ## 9. Observabilidade
 
@@ -657,7 +709,7 @@ Não há tracing distribuído no projeto, e a reunião não autorizou ferramenta
 9. **Validação:** `url` com `http://` → 400 com detalhe `WEBHOOK_INVALID_URL`.
 10. **Secret:** aparece só nas respostas de criação e rotação, nunca em listagem, deliveries ou logs.
 11. **Processo:** matar a API não interrompe o worker, e vice-versa. `SIGTERM` no worker termina o lote e sai com código 0.
-12. **Testes:** `npm test` verde, com os testes novos em `tests/webhooks.test.ts`.
+12. **Testes:** `npm test` verde, com os testes novos de webhooks em `tests/`, no mesmo padrão de `tests/orders.test.ts`.
 
 ## 12. Riscos e mitigação
 
@@ -678,7 +730,7 @@ Não há tracing distribuído no projeto, e a reunião não autorizou ferramenta
 
 | Arquivo existente | Como o módulo de webhooks se integra |
 |---|---|
-| `src/modules/orders/order.service.ts` | **Principal alteração em lógica existente.** Em `changeStatus`, logo depois de `tx.orderStatusHistory.create(...)` e antes do `refreshed`, entra a chamada `await publishWebhookEvent(tx, order, from, to)` ([09:41] Bruno), com um 5º parâmetro opcional `{ requestId }` para correlação 🔧. O `tx` (`Prisma.TransactionClient`, já tipado como `TxClient` no arquivo) é o mesmo da transação, garantindo atomicidade. O construtor de `OrderService` **não** muda: é uma função importada de `src/modules/webhooks/webhook.publisher.ts`, sem repository injetado ([09:41] Diego). `create()` não é alterado. |
+| `src/modules/orders/order.service.ts` | **Principal alteração em lógica existente.** Em `changeStatus`, logo depois de `tx.orderStatusHistory.create(...)` e antes do `refreshed`, entra a chamada `await publishWebhookEvent(tx, order, from, to)` ([09:41] Bruno), com um 5º parâmetro opcional `{ requestId }` para correlação 🔧. O `tx` (`Prisma.TransactionClient`, já tipado como `TxClient` no arquivo) é o mesmo da transação, garantindo atomicidade. O construtor de `OrderService` **não** muda: é uma função importada do arquivo novo `src/modules/webhooks/webhook.publisher.ts`, sem repository injetado ([09:41] Diego). `create()` não é alterado. |
 | `src/modules/orders/order.controller.ts` | 🔧 `changeStatus` passa `req.id` (o requestId do `request-logger`) para `OrderService.changeStatus`, que ganha um parâmetro opcional. É a única outra mudança fora do módulo novo, opcional e sem quebrar os chamadores atuais. |
 | `src/modules/orders/order.status.ts` / `prisma/schema.prisma` (`enum OrderStatus`) | O filtro `events` do webhook é validado com `z.array(z.nativeEnum(OrderStatus))`, o mesmo padrão de `updateOrderStatusSchema` em `src/modules/orders/order.schemas.ts`. Assim, só status reais da máquina de estados são aceitos. |
 | `prisma/schema.prisma` + `prisma/migrations/` | Novos models da seção 4 e relação `webhookEndpoints` em `Customer`. Migration via `npm run db:migrate` (`prisma migrate dev`). |
@@ -689,7 +741,7 @@ Não há tracing distribuído no projeto, e a reunião não autorizou ferramenta
 | `src/middlewares/request-logger.middleware.ts` | Fonte do `req.id` gravado em `webhook_outbox.requestId` (seção 9.3). |
 | `src/app.ts` | `buildControllers` instancia `WebhookRepository` → `WebhookService` → `WebhookController` com o mesmo `prisma` e registra `webhooks` no objeto `Controllers`. |
 | `src/routes/index.ts` | O tipo `Controllers` ganha `webhooks: WebhookController`. `buildApiRouter` monta `router.use('/webhooks', buildWebhookRouter(...))`, `router.use('/customers/:customerId/webhooks', buildCustomerWebhookRouter(...))` (com `Router({ mergeParams: true })`, registrado depois de `/customers`; rotas não casadas pelo router de customers seguem adiante) e `router.use('/admin/webhooks', buildWebhookAdminRouter(...))`. `customer.routes.ts` não muda. |
-| `src/server.ts` | Modelo para `src/worker.ts`: `bootstrap()`, `logger.info(..., 'webhook_worker_started')`, handlers `SIGINT`/`SIGTERM` com `prisma.$disconnect()` ([09:11] Larissa). |
+| `src/server.ts` | Modelo para o novo `src/worker.ts`: `bootstrap()`, `logger.info(..., 'webhook_worker_started')`, handlers `SIGINT`/`SIGTERM` com `prisma.$disconnect()` ([09:11] Larissa). |
 | `src/config/database.ts` | O worker importa o `prisma` exportado. Como o módulo instancia o client ao ser carregado, o processo worker tem **sua própria** instância (mesma `DATABASE_URL`) ([09:30] Bruno), sem criar um segundo client. |
 | `src/config/env.ts` | O `envSchema` ganha `WEBHOOK_SECRET_ENCRYPTION_KEY: z.string().regex(/^[0-9a-f]{64}$/)` (32 bytes em hex). Se faltar, o processo não sobe, pelo mesmo mecanismo de `loadEnv()`. O worker valida o mesmo `.env`. Também entra em `.env.example`. |
 | `src/shared/logger/index.ts` | Reusado (`logger.child(...)` no worker). Acrescentar `'*.secret'` e `'*.previousSecret'` em `redactPaths`. |
@@ -697,7 +749,7 @@ Não há tracing distribuído no projeto, e a reunião não autorizou ferramenta
 | `package.json` | Scripts novos: `"worker": "tsx watch --env-file=.env src/worker.ts"` e `"start:worker": "node --env-file=.env dist/worker.js"` ([09:11] Larissa). O build atual (`tsconfig.build.json`) já compila `src/**`. |
 | `tests/setup.ts` / `tests/helpers/factories.ts` | `beforeEach` passa a limpar `webhookDeadLetter`, `webhookDelivery`, `webhookOutbox` e `webhookEndpoint` antes de `customer`. Nova factory `createTestWebhook()`. |
 
-Estrutura do módulo novo ([09:27]–[09:28] Bruno):
+Estrutura do módulo novo ([09:27]–[09:28] Bruno). **Nenhum destes arquivos existe hoje; todos são criados pela feature:**
 
 ```
 src/worker.ts                              entry-point do processo worker

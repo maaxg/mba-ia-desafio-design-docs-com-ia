@@ -31,7 +31,7 @@ A tarefa foi transformar essa conversa, cruzada com o código real, num pacote d
 
 ## Prompts customizados
 
-Os prompts abaixo estão **exatamente como foram enviados**, com erros de digitação e tudo. A única edição é no prompt 1: o enunciado colado foi substituído por um marcador, para não repetir aqui o texto inteiro do desafio.
+Os prompts abaixo estão **exatamente como foram enviados**, com erros de digitação e tudo. A única edição é nos prompts 1 e 4: o texto colado do enunciado foi substituído por um marcador, para não repetir aqui o texto inteiro do desafio.
 
 **1. Prompt inicial (meu, para o Claude Code).** Definiu o ponto de partida: clonar o fork antes de qualquer coisa e trabalhar a partir do enunciado completo, inclusive a checklist de critérios de aceite.
 
@@ -63,9 +63,19 @@ Verifique caminhos de arquivo citados com ls/grep. Reporte uma lista priorizada 
 1 -> O que voce acha que deve fazer? Sempre siga as instrucoes do prompt. 2 -> Tome a decisao e adicione a doc necessaria que faz mais sentido. 4-> ele espera os prompts exatmente como voce os digitou, entao corrija para ser adequeado aos criterios de aceite. Tudo o que voce fez deve ser passado pelos criterios de aceite.
 ```
 
+**4. Validação final (meu, depois do commit).** Colei de novo a lista de critérios de aceite e pedi a validação item a item, com correção do que não passasse:
+
+```text
+obrigado! Valida pra mim agora os criterios de aceite:
+
+<lista "Critérios de Aceite" do enunciado colada aqui, incluindo a estrutura obrigatória do entregável>
+
+  Caso algum nao esteja de acordo faca a correcao
+```
+
 ## Iterações e ajustes
 
-Foram **4 iterações principais**: redação inicial com autocrítica, revisão adversarial, validação mecânica do tracker e revisão item a item contra a checklist do enunciado. Os ajustes mais relevantes estão abaixo.
+Foram **5 iterações principais**: redação inicial com autocrítica, revisão adversarial, validação mecânica do tracker, revisão item a item contra a checklist do enunciado e uma validação final depois do commit. Os ajustes mais relevantes estão abaixo.
 
 **Iteração 1: redação inicial (autocrítica contra o código)**
 - **customer_id do JWT.** Em [09:31] o PM disse "customer_id implícito do JWT". Um minuto depois ([09:32]), Bruno e Larissa corrigiram: o JWT é do operador, e o customer vem no body ou no path. Uma leitura linear teria registrado a versão errada.
@@ -92,6 +102,10 @@ Foram **4 iterações principais**: redação inicial com autocrítica, revisão
 - **Pasta de ADRs com 5 a 8 arquivos.** Foi removido um `docs/adrs/README.md` (índice) para que a pasta contenha apenas os 8 ADRs.
 - **Cobertura do tracker.** Cenários, critérios de aceitação, riscos, dependências e componentes estavam sem linha. O tracker foi de 183 para 306 linhas, com 86% `TRANSCRICAO` e 43 linhas `CODIGO`.
 - **Prompts deste README.** A primeira versão mostrava prompts reescritos depois, como resumo das instruções. Foram trocados pelos prompts literais acima.
+
+**Iteração 5: validação final** (prompt 4)
+- **Endpoints sem request e response explícitos.** Só o `POST /webhooks` mostrava os dois payloads. O `PATCH` remetia o response a outra seção, e os endpoints sem body (GETs, rotação de secret, replay) não exibiam o request. Cada endpoint do FDD §6.1 ganhou o request (linha HTTP, headers e body, quando há) e o `PATCH` ganhou o response completo.
+- **Arquivos que ainda não existem.** O script apontou `src/worker.ts` e os arquivos de `src/modules/webhooks/` como inexistentes. Eles vêm da própria reunião ([09:11] Larissa, [09:27]–[09:28] Bruno) e são o que a feature vai criar, mas o texto não deixava isso claro. Todas as menções passaram a dizer "novo" ou "a criar", e o FDD e o RFC ganharam uma nota dizendo que os demais caminhos já existem. A única menção sem origem na reunião, um arquivo de testes com nome inventado, foi trocada por "testes novos em `tests/`, no padrão de `tests/orders.test.ts`".
 
 ## Como navegar a entrega
 

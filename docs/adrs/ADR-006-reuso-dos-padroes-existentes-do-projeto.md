@@ -29,7 +29,7 @@ O time é pequeno ([09:07] Diego), e a reunião rejeitou introduzir peças novas
 
 **Reuso máximo do que já existe** ([09:30] Larissa):
 
-1. Novo módulo **`src/modules/webhooks/`** com a mesma estrutura dos demais ([09:27] Bruno), mais o `webhook.processor.ts` do worker ([09:28] Bruno).
+1. Novo módulo **`src/modules/webhooks/`** (a criar) com a mesma estrutura dos demais ([09:27] Bruno), mais o `webhook.processor.ts` do worker ([09:28] Bruno).
 2. **Erros do módulo herdam de `AppError`** com o **prefixo `WEBHOOK_`** (`WEBHOOK_NOT_FOUND`, `WEBHOOK_INVALID_URL`, `WEBHOOK_SECRET_REQUIRED`, ...) ([09:28] Bruno, [09:29] Larissa).
 3. **Pino** (`logger` de `src/shared/logger/index.ts`) em todo o módulo e no worker. Nenhuma biblioteca de log nova ([09:29] Bruno).
 4. **`errorMiddleware` sem alterações:** ele já trata qualquer `AppError` ([09:29] Bruno).

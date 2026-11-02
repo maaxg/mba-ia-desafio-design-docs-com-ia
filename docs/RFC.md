@@ -31,6 +31,8 @@ O problema técnico central é **publicar um efeito colateral externo (HTTP) a p
 
 ### 3.1 Visão geral
 
+`src/worker.ts` e `src/modules/webhooks` são arquivos **novos**, a criar ([09:11] Larissa, [09:28] Bruno). Os demais caminhos citados já existem no repositório.
+
 ```
  API (src/server.ts)                          Worker (src/worker.ts)
  ┌──────────────────────────────┐             ┌──────────────────────────────┐
@@ -57,7 +59,7 @@ O problema técnico central é **publicar um efeito colateral externo (HTTP) a p
 | **Autenticidade** | HMAC-SHA256 do corpo, secret por endpoint, rotação com grace period de 24h, apenas `https`. | [ADR-004](adrs/ADR-004-hmac-sha256-com-secret-por-endpoint.md) |
 | **Ordem e isolamento** | Ordem por pedido mantida também durante o retry; um cliente lento não atrasa os outros. | [ADR-008](adrs/ADR-008-ordem-por-pedido-e-isolamento-por-endpoint.md) |
 | **Semântica de entrega** | At-least-once. O `X-Event-Id` é estável entre retentativas. | [ADR-005](adrs/ADR-005-at-least-once-com-x-event-id.md) |
-| **Encaixe no código** | Módulo `src/modules/webhooks`, `AppError` com prefixo `WEBHOOK_`, Pino, `requireRole`. | [ADR-006](adrs/ADR-006-reuso-dos-padroes-existentes-do-projeto.md) |
+| **Encaixe no código** | Módulo novo `src/modules/webhooks` (a criar), `AppError` com prefixo `WEBHOOK_`, Pino, `requireRole`. | [ADR-006](adrs/ADR-006-reuso-dos-padroes-existentes-do-projeto.md) |
 
 ### 3.3 Superfície de API (visão de alto nível)
 
